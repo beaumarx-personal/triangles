@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Language" content="en">
+        <link rel="stylesheet" type="text/css" href="css/w3.css"/>
+        <title>Triangles</title>
+        <style>      
+            .w3-dbtheme {color:#fff !important; background-color:#002857 !important}
+            .w3-text-dbtheme {color:#002857 !important}
+            .w3-border-dbtheme {border-color:#002857 !important}
+
+            .w3-hover-dbtheme:hover {color:#fff !important; background-color:#002857 !important}
+            .w3-hover-text-dbtheme:hover {color:#002857 !important}
+            .w3-hover-border-dbtheme:hover {border-color:#002857 !important}
+            
+            
+            .w3-lbtheme {color:#fff !important; background-color:#69ace5 !important}
+            .w3-text-lbtheme {color:#69ace5 !important}
+            .w3-border-lbtheme {border-color:#69ace5 !important}
+
+            .w3-hover-lbtheme:hover {color:#fff !important; background-color:#69ace5 !important}
+            .w3-hover-text-lbtheme:hover {color:#69ace5 !important}
+            .w3-hover-border-lbtheme:hover {border-color:#69ace5 !important}
+
+            .w3-table td, .w3-table th {
+                border-collapse: collapse;
+                padding: 3px;
+                margin: 0;
+                vertical-align: middle;
+                text-align: center;
+                white-space: nowrap;
+            }            
+
+            .site-export td, .site-export th {
+                border-collapse: collapse;
+                border:1px solid lightgray;
+                padding: 2px;
+                margin: 0;
+                vertical-align: middle;
+                text-align: center;
+                white-space: nowrap;
+            }
+            
+            .etable td, .etable th {
+                border-collapse: collapse;
+                padding: 3px;
+                margin: 0;
+                vertical-align: middle;
+                text-align: left;
+                white-space: nowrap;
+            }
+
+            .etable thead th {
+                border-collapse: collapse;
+                padding: 3px;
+                margin: 0;
+                vertical-align: middle;
+                position: sticky;
+                top:0;
+                background-color: #69ace5;
+                height: 31px;
+            }
+            
+            .sfile thead th {
+                border-collapse: collapse;
+                padding: 3px;
+                margin: 0;
+                vertical-align: middle;
+                position: sticky;
+                top:0;
+                background-color: #69ace5;
+                height: 31px;              
+            }
+
+            .popup-table td, .popup-table th {
+                border: 1px solid black;                
+                padding: 0px;
+                margin: 0;
+                vertical-align: middle;
+                text-align: center;
+            }
+
+            .genset-row {
+                cursor: pointer;
+            }
+
+            .site-control-row {
+                cursor: pointer;
+            }
+
+            input[type=checkbox] {
+                width: 20px;
+                height: 20px;
+            }
+
+            body {
+                background-repeat: no-repeat;
+                background-position-x: center;
+                background-position-y:-30%;
+                background-size:cover;
+                background-color:#C8C8C8;
+            }
+
+        </style>   
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            let socket = io({
+                transports: ['websocket']
+            });
+
+            let randomHandle, printHandle;
+            let margin = 10;
+
+            // Middle
+            let point_a = {name: 'Point A', x: 0, y: 0};
+            let point_b = {name: 'Point B', x: 0, y: 0};
+            let point_c = {name: 'Point C', x: 0, y: 0};
+
+            // Left
+            let point_d = {name: 'Point D', x: 0, y: 0};
+            let point_e = {name: 'Point E', x: 0, y: 0};
+            let point_f = {name: 'Point F', x: 0, y: 0};
+
+            // Right
+            let point_g = {name: 'Point G', x: 0, y: 0};
+            let point_h = {name: 'Point H', x: 0, y: 0};
+            let point_i = {name: 'Point I', x: 0, y: 0};
+
+            let used_points = [];
+            let point_gen_interval = 40;
+
+            function resizeCanvas() {
+                let cvs = document.getElementById("canvas");
+                let height_offset = 52;
+                cvs.height = Math.floor(window.innerHeight-height_offset)
+                cvs.width = Math.floor(window.innerWidth);
+                console.log(`Canvas Width: ${cvs.width} Canvas Height: ${cvs.height}`);
+            }
+
+            function clearCanvas() {
+                stopRandomPoints()
+
+                let cvs = document.getElementById("canvas");
+                let ctx = cvs.getContext('2d', { willReadFrequently: true });
+                let image_data = ctx.getImageData(0,0,cvs.width,cvs.height);
+
+                for (let index = 0; index < (image_data.data.length); index+=4) {
+                    image_data.data[index] = 0;
+                    image_data.data[index+1] = 0;
+                    image_data.data[index+2] = 0;
+                    image_data.data[index+3] = 255;     
+                }
+                ctx.putImageData(image_data, 0, 0);
+            }
+
+            function boundingPoints() {
+                let cvs = document.getElementById("canvas");
+                let ctx = cvs.getContext('2d', { willReadFrequently: true });
+
+                let altitude = cvs.height - (2*margin);
+                let side_length = (2 * altitude) / Math.sqrt(3);
+                
+                point_a.x = parseInt(cvs.width / 2);
+                point_a.y = margin;
+
+                point_b.x = point_a.x - (side_length / 2);
+                point_b.y = point_a.y + altitude;
+
+                point_c.x = point_a.x + (side_length / 2);
+                point_c.y = point_a.y + altitude;
+
+                point_d.x = point_a.x - margin;
+                point_d.y = point_a.y;
+
+                point_e.x = point_d.x - side_length;
+                point_e.y = point_d.y;
+
+                point_f.x = point_d.x - (side_length / 2);
+                point_f.y = point_d.y + altitude;
+
+                point_g.x = point_a.x + margin;
+                point_g.y = point_a.y;
+
+                point_h.x = point_g.x + side_length;
+                point_h.y = point_g.y;
+
+                point_i.x = point_g.x + (side_length / 2);
+                point_i.y = point_g.y + altitude;
+
+                // ctx.beginPath();
+                // ctx.moveTo(point_a.x, point_a.y);
+                // ctx.lineTo(point_b.x, point_b.y);
+                // ctx.lineTo(point_c.x, point_c.y);
+                // ctx.fill();
+
+                // ctx.beginPath();
+                // ctx.moveTo(point_d.x, point_d.y);
+                // ctx.lineTo(point_e.x, point_e.y);
+                // ctx.lineTo(point_f.x, point_f.y);
+                // ctx.fill();
+
+                // ctx.beginPath();
+                // ctx.moveTo(point_g.x, point_g.y);
+                // ctx.lineTo(point_h.x, point_h.y);
+                // ctx.lineTo(point_i.x, point_i.y);
+                // ctx.fill();
+            }
+
+            function isPointInTriangle(click_event) {
+                let x = click_event.clientX;
+                let y = click_event.clientY;
+
+                // Calculate barycentric coordinates
+                let detT = (point_b.x - point_a.x) * (point_c.y - point_a.y) - (point_c.x - point_a.x) * (point_b.y - point_a.y);
+                let alpha = ((point_c.y - point_a.y) * (x - point_a.x) + (point_a.x - point_c.x) * (y - point_a.y)) / detT;
+                let beta = ((point_a.y - point_b.y) * (x - point_a.x) + (point_b.x - point_a.x) * (y - point_a.y)) / detT;
+                let gamma = 1 - alpha - beta;
+
+                if (alpha >= 0 && beta >= 0 && gamma >= 0 && alpha + beta + gamma === 1) {
+                    console.log(`Point is within bounding triangle`);
+                } else {
+                    console.log(`Point is NOT within bounding triangle`);
+                }
+
+                // drawPoint(x, y);
+            }
+
+            function getRandomPointInTriangle() {
+                // Generate random barycentric coordinates
+                let alpha = Math.random();
+                let beta = Math.random() * (1 - alpha);
+                let gamma = 1 - alpha - beta;
+
+                // Calculate the coordinates of the point using barycentric coordinates
+                let x = parseInt(alpha * point_a.x + beta * point_b.x + gamma * point_c.x);
+                let y = parseInt(alpha * point_a.y + beta * point_b.y + gamma * point_c.y);
+
+                // console.log(`Random point in triangle: X: ${x} Y: ${y}`);
+                return {x_val: x, y_val: y}
+            }
+
+            function getRandomPointInTriangleB() {
+                // Generate random barycentric coordinates
+                let alpha = Math.random();
+                let beta = Math.random() * (1 - alpha);
+                let gamma = 1 - alpha - beta;
+
+                // Calculate the coordinates of the point using barycentric coordinates
+                let x = parseInt(alpha * point_d.x + beta * point_e.x + gamma * point_f.x);
+                let y = parseInt(alpha * point_d.y + beta * point_e.y + gamma * point_f.y);
+
+                // console.log(`Random point in triangle: X: ${x} Y: ${y}`);
+                return {x_val: x, y_val: y}
+            }
+
+            function getRandomPointInTriangleC() {
+                // Generate random barycentric coordinates
+                let alpha = Math.random();
+                let beta = Math.random() * (1 - alpha);
+                let gamma = 1 - alpha - beta;
+
+                // Calculate the coordinates of the point using barycentric coordinates
+                let x = parseInt(alpha * point_g.x + beta * point_h.x + gamma * point_i.x);
+                let y = parseInt(alpha * point_g.y + beta * point_h.y + gamma * point_i.y);
+
+                // console.log(`Random point in triangle: X: ${x} Y: ${y}`);
+                return {x_val: x, y_val: y}
+            }
+
+            function getRandomVertex() {
+                let random_choice = Math.floor(Math.random() * (3));
+                let random_point;
+                if (random_choice == 0) {
+                    random_point = point_a;
+                } else if (random_choice == 1) {
+                    random_point = point_b;
+                } else if (random_choice == 2) {
+                    random_point = point_c;
+                }
+
+                // console.log(`Randomly chose bounding point: ${random_point.name}`);
+                return random_point;
+            }
+
+            function getRandomVertexB() {
+                let random_choice = Math.floor(Math.random() * (3));
+                let random_point;
+                if (random_choice == 0) {
+                    random_point = point_d;
+                } else if (random_choice == 1) {
+                    random_point = point_e;
+                } else if (random_choice == 2) {
+                    random_point = point_f;
+                }
+
+                // console.log(`Randomly chose bounding point: ${random_point.name}`);
+                return random_point;
+            }
+
+            function getRandomVertexC() {
+                let random_choice = Math.floor(Math.random() * (3));
+                let random_point;
+                if (random_choice == 0) {
+                    random_point = point_g;
+                } else if (random_choice == 1) {
+                    random_point = point_h;
+                } else if (random_choice == 2) {
+                    random_point = point_i;
+                }
+
+                // console.log(`Randomly chose bounding point: ${random_point.name}`);
+                return random_point;
+            }
+
+            function drawPoint(x, y) {
+                let cvs = document.getElementById("canvas");
+                let ctx = cvs.getContext('2d', { willReadFrequently: true });
+                let image_data = ctx.getImageData(0,0,cvs.width,cvs.height);
+                let point = ((cvs.width * y) + x) * 4;
+                image_data.data[point] = 255;
+                image_data.data[point+1] = 255;
+                image_data.data[point+2] = 255;
+                image_data.data[point+3] = 255;
+                ctx.putImageData(image_data, 0, 0);
+            }
+
+            function drawPoints(x_arr, y_arr) {
+                let cvs = document.getElementById("canvas");
+                let ctx = cvs.getContext('2d', { willReadFrequently: true });
+                let image_data = ctx.getImageData(0,0,cvs.width,cvs.height);
+
+                for (let i=0; i<x_arr.length; i++) {
+                    let point = ((cvs.width * y_arr[i]) + x_arr[i]) * 4;
+                    image_data.data[point] = 255;
+                    image_data.data[point+1] = 255;
+                    image_data.data[point+2] = 255;
+                    image_data.data[point+3] = 255;
+                }
+                ctx.putImageData(image_data, 0, 0);
+            }
+
+            function randomPoints() {
+                if (!randomHandle) {
+                    let prev_point = getRandomPointInTriangle();
+                    let prev_pointB = getRandomPointInTriangleB();
+                    let prev_pointC = getRandomPointInTriangleC();
+    
+                    randomHandle = setInterval(function() {
+                        let x_array = [];
+                        let y_array = [];
+
+                        while (x_array.length < 20) {
+                            let rand_vtx = getRandomVertex();
+                            prev_point.x_val = parseInt((prev_point.x_val + rand_vtx.x) / 2);
+                            prev_point.y_val = parseInt((prev_point.y_val + rand_vtx.y) / 2);
+
+                            if (!used_points.includes(`${prev_point.x_val},${prev_point.y_val}`)) {
+                                x_array.push(prev_point.x_val);
+                                y_array.push(prev_point.y_val);
+                                used_points.push(`${prev_point.x_val},${prev_point.y_val}`);
+
+                                if (used_points.length >= 100000) {
+                                    stopRandomPoints();
+                                }
+                            }       
+                        }
+                        
+                        while (x_array.length < 40) {
+                            let rand_vtx = getRandomVertexB();
+                            prev_pointB.x_val = parseInt((prev_pointB.x_val + rand_vtx.x) / 2);
+                            prev_pointB.y_val = parseInt((prev_pointB.y_val + rand_vtx.y) / 2);
+
+                            if (!used_points.includes(`${prev_pointB.x_val},${prev_pointB.y_val}`)) {
+                                x_array.push(prev_pointB.x_val);
+                                y_array.push(prev_pointB.y_val);
+                                used_points.push(`${prev_pointB.x_val},${prev_pointB.y_val}`);
+
+                                if (used_points.length >= 100000) {
+                                    stopRandomPoints();
+                                }
+                            }        
+                        }
+
+                        while (x_array.length < 60) {
+                            let rand_vtx = getRandomVertexC();
+                            prev_pointC.x_val = parseInt((prev_pointC.x_val + rand_vtx.x) / 2);
+                            prev_pointC.y_val = parseInt((prev_pointC.y_val + rand_vtx.y) / 2);
+
+                            if (!used_points.includes(`${prev_pointC.x_val},${prev_pointC.y_val}`)) {
+                                x_array.push(prev_pointC.x_val);
+                                y_array.push(prev_pointC.y_val);
+                                used_points.push(`${prev_pointC.x_val},${prev_pointC.y_val}`);
+
+                                if (used_points.length >= 100000) {
+                                    stopRandomPoints();
+                                }
+                            }        
+                        }
+
+                        // drawPoint(prev_point.x_val, prev_point.y_val);
+                        drawPoints(x_array, y_array);
+                    }, point_gen_interval);
+                }
+            }
+
+            function stopRandomPoints() {
+                if (randomHandle) {
+                    clearInterval(randomHandle);
+                    randomHandle = null;
+                }
+
+                if (printHandle) {
+                    clearInterval(printHandle);
+                    printHandle = null;
+                }
+            }
+
+            function init() {
+                resizeCanvas();
+                clearCanvas();
+                boundingPoints();
+
+                printHandle = setInterval(function() {
+                    console.log(`Used Points Count: ${used_points.length}`);
+                }, 1000);
+            }
+        </script>    
+    </head>
+    <body onload="init()">
+        <div class="w3-row">
+            <canvas id="canvas" onclick="isPointInTriangle(event)" width="1024" height="600"></canvas>
+        </div>
+        <div class="w3-bottom">
+            <div class="w3-bar w3-lbtheme">
+                <button class="w3-button w3-xlarge" onclick="randomPoints()" style="padding-left: 25px; padding-right: 25px;">Start</button>
+                <button class="w3-button w3-xlarge" onclick="stopRandomPoints()" style="padding-left: 25px; padding-right: 25px;">Stop</button>
+                <button class="w3-button w3-xlarge" onclick="clearCanvas()" style="padding-left: 25px; padding-right: 25px;">Reset</button>
+            </div>
+        </div>
+    </body>
+</html>
